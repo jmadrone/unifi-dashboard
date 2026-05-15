@@ -54,7 +54,10 @@ export function Hosts() {
                   label="Owner"
                   value={h.userData?.fullName ?? h.userData?.email ?? "—"}
                 />
-                <Row label="Last seen" value={relativeTime(h.lastConnectionStateChange)} />
+                <Row
+                  label={online ? "Online since" : "Offline since"}
+                  value={relativeTime(h.lastConnectionStateChange)}
+                />
                 <Row label="Registered" value={relativeTime(h.registrationTime)} />
                 <Row label="Backup" value={relativeTime(h.latestBackupTime)} />
               </dl>

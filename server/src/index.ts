@@ -404,6 +404,24 @@ function summarizeHosts(hosts: any[]) {  let online = 0;
  * synthetic site entries for every host that isn't already represented as a site.
  */
 function mergeSitesWithHosts(sites: any[], hosts: any[], devices: any[] = []): any[] {
+  // Index hosts by id so we can look up display names for sites whose
+  // meta.desc is generic (e.g. "Default").
+  const hostsById = new Map<string, any>();
+  for (const h of hosts) {
+    const id = String(h?.id ?? h?.hardwareId ?? "");
+    if (id) hostsById.set(id, h);
+  }
+  const hostDisplayName = (hostId: string): string | undefined => {
+    const h = hostsById.get(hostId);
+    if (!h) return undefined;
+    const rs = h.reportedState ?? {};
+    return rs.name ?? rs.hostname ?? rs.hardware?.name ?? rs.hardware?.shortname ?? undefined;
+  };
+  const isGenericName = (v: unknown): boolean => {
+    const s = String(v ?? "").trim().toLowerCase();
+    return !s || s === "default";
+  };
+
   // Build a per-host device count map from /v1/devices groups (keyed by hostId).
   const deviceCountsByHost = new Map<string, { total: number; offline: number }>();
   for (const g of devices) {
@@ -426,24 +444,31 @@ function mergeSitesWithHosts(sites: any[], hosts: any[], devices: any[] = []): a
     }
   }
 
-  // Enrich existing sites whose totalDevice is 0 but we have devices for that host.
+  // Enrich existing sites: fill in device counts when the API returned 0, and
+  // replace generic "Default" names with the owning console's reported name.
   const enrichedSites = sites.map((s) => {
     const counts = s?.statistics?.counts ?? {};
     const totalDevice = Number(counts.totalDevice ?? 0);
     const hostId = s?.hostId ? String(s.hostId) : "";
-    if (totalDevice > 0 || !hostId) return s;
-    const c = deviceCountsByHost.get(hostId);
-    if (!c || c.total === 0) return s;
+    const c = hostId ? deviceCountsByHost.get(hostId) : undefined;
+
+    const nextCounts =
+      totalDevice === 0 && c && c.total > 0
+        ? { ...counts, totalDevice: c.total, offlineDevice: Number(counts.offlineDevice ?? 0) || c.offline }
+        : counts;
+
+    const meta = s?.meta ?? {};
+    const hostName = hostId ? hostDisplayName(hostId) : undefined;
+    const nextMeta =
+      hostName && isGenericName(meta.desc) && isGenericName(meta.name)
+        ? { ...meta, desc: hostName }
+        : meta;
+
+    if (nextCounts === counts && nextMeta === meta) return s;
     return {
       ...s,
-      statistics: {
-        ...(s.statistics ?? {}),
-        counts: {
-          ...counts,
-          totalDevice: c.total,
-          offlineDevice: Number(counts.offlineDevice ?? 0) || c.offline,
-        },
-      },
+      meta: nextMeta,
+      statistics: { ...(s.statistics ?? {}), counts: nextCounts },
     };
   });
 
