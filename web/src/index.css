@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: theme('fontFamily.sans');
+  background:
+    radial-gradient(1200px 600px at 10% -10%, hsla(196,95%,55%,0.08), transparent 60%),
+    radial-gradient(1000px 800px at 110% 10%, hsla(265,80%,60%,0.08), transparent 60%),
+    theme('colors.background');
+  background-attachment: fixed;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(222 18% 22%);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(222 18% 30%);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .grid-fluid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+  .shimmer {
+    background-image: linear-gradient(90deg,
+      hsla(0,0%,100%,0) 0%,
+      hsla(0,0%,100%,0.06) 50%,
+      hsla(0,0%,100%,0) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2.4s linear infinite;
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "unifi-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Modern NOC dashboard for Ubiquiti UniFi sites (UniFi Site Manager API).",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,magenta \"npm:dev -w server\" \"npm:dev -w web\"",
+    "build": "npm run build -w server && npm run build -w web",
+    "start": "npm run start -w server",
+    "lint": "npm run lint -w web",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
