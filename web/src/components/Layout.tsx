@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { Activity, Boxes, LayoutDashboard, MapPinned, Network, Wifi } from "lucide-react";
+import { Activity, Boxes, LayoutDashboard, MapPinned, Network } from "lucide-react";
 import { useEffect, useState } from "react";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { cn } from "@/lib/utils";
@@ -7,13 +7,17 @@ import { useHealth, useOverview } from "@/hooks/useUnifi";
 
 export function Layout() {
   return (
-    <div className="min-h-screen w-full grid grid-cols-[260px_1fr]">
-      <Sidebar />
-      <div className="flex flex-col min-w-0">
-        <Topbar />
-        <main className="flex-1 min-w-0 p-6 lg:p-8 2xl:p-10">
-          <Outlet />
-        </main>
+    <div className="min-h-screen w-full flex justify-center bg-background">
+      {/* Cap layout width at 3840px (4K) so the dashboard fills a wall-mounted
+          4K monitor edge-to-edge without stretching further on larger displays. */}
+      <div className="w-full max-w-[3840px] min-h-screen grid grid-cols-[260px_1fr]">
+        <Sidebar />
+        <div className="flex flex-col min-w-0">
+          <Topbar />
+          <main className="flex-1 min-w-0 p-6 lg:p-8 2xl:p-10">
+            <Outlet />
+          </main>
+        </div>
       </div>
     </div>
   );
@@ -30,12 +34,14 @@ function Sidebar() {
   return (
     <aside className="border-r border-border/70 bg-panel/40 backdrop-blur-md flex flex-col">
       <div className="px-5 py-5 flex items-center gap-3">
-        <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-accent to-purple-500 grid place-items-center shadow-glow">
-          <Wifi className="h-5 w-5 text-background" strokeWidth={2.6} />
-        </div>
+        <img
+          src="/logo.png"
+          alt="Emerald Security LLC"
+          className="h-9 w-9 rounded-lg object-contain shadow-glow"
+        />
         <div className="leading-tight">
           <div className="text-base font-semibold tracking-tight">UniFi NOC</div>
-          <div className="text-[10px] uppercase tracking-[0.18em] text-muted">Fleet Operations</div>
+          <div className="text-[10px] uppercase tracking-[0.18em] text-muted">Emerald Security LLC</div>
         </div>
       </div>
 
