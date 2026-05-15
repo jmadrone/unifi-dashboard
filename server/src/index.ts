@@ -175,19 +175,21 @@ app.get("/api/sites", async (_req, res) => {
     res.json(mockSites());
     return;
   }
-  const [sitesFan, hostsFan] = await Promise.all([
+  const [sitesFan, hostsFan, devicesFan] = await Promise.all([
     fanOutPaginated<any>("/v1/sites"),
     fanOutPaginated<any>("/v1/hosts"),
+    fanOutPaginated<any>("/v1/devices"),
   ]);
   const sites = dedupeBy(sitesFan.data, (s) => String(s?.siteId ?? ""));
   const hosts = dedupeBy(hostsFan.data, (h) => String(h?.id ?? ""));
+  const devices = dedupeBy(devicesFan.data, (g) => String(g?.hostId ?? ""));
   rememberOwnership(sites, hosts);
-  const merged = mergeSitesWithHosts(sites, hosts);
+  const merged = mergeSitesWithHosts(sites, hosts, devices);
   res.json({
     data: merged,
     httpStatusCode: 200,
     accounts: clients.map((c) => c.label),
-    errors: [...sitesFan.errors, ...hostsFan.errors],
+    errors: [...sitesFan.errors, ...hostsFan.errors, ...devicesFan.errors],
   });
 });
 
@@ -286,9 +288,9 @@ app.get("/api/overview", async (_req, res) => {
       ]);
       hosts = dedupeBy(hostsFan.data, (h) => String(h?.id ?? ""));
       const rawSites = dedupeBy(sitesFan.data, (s) => String(s?.siteId ?? ""));
-      rememberOwnership(rawSites, hosts);
-      sites = mergeSitesWithHosts(rawSites, hosts);
       devices = dedupeBy(devicesFan.data, (g) => String(g?.hostId ?? ""));
+      rememberOwnership(rawSites, hosts);
+      sites = mergeSitesWithHosts(rawSites, hosts, devices);
     }
 
     const aggregate = {
@@ -401,9 +403,52 @@ function summarizeHosts(hosts: any[]) {  let online = 0;
  * the API otherwise omits never appear there. To give a complete view, we merge in
  * synthetic site entries for every host that isn't already represented as a site.
  */
-function mergeSitesWithHosts(sites: any[], hosts: any[]): any[] {
+function mergeSitesWithHosts(sites: any[], hosts: any[], devices: any[] = []): any[] {
+  // Build a per-host device count map from /v1/devices groups (keyed by hostId).
+  const deviceCountsByHost = new Map<string, { total: number; offline: number }>();
+  for (const g of devices) {
+    const hostId = String(g?.hostId ?? "");
+    if (!hostId) continue;
+    const arr = Array.isArray(g?.devices) ? g.devices : [];
+    let total = 0;
+    let offline = 0;
+    for (const d of arr) {
+      if (!d || typeof d !== "object") continue;
+      total++;
+      if (String(d.status ?? "").toLowerCase() !== "online") offline++;
+    }
+    const prev = deviceCountsByHost.get(hostId);
+    if (prev) {
+      prev.total += total;
+      prev.offline += offline;
+    } else {
+      deviceCountsByHost.set(hostId, { total, offline });
+    }
+  }
+
+  // Enrich existing sites whose totalDevice is 0 but we have devices for that host.
+  const enrichedSites = sites.map((s) => {
+    const counts = s?.statistics?.counts ?? {};
+    const totalDevice = Number(counts.totalDevice ?? 0);
+    const hostId = s?.hostId ? String(s.hostId) : "";
+    if (totalDevice > 0 || !hostId) return s;
+    const c = deviceCountsByHost.get(hostId);
+    if (!c || c.total === 0) return s;
+    return {
+      ...s,
+      statistics: {
+        ...(s.statistics ?? {}),
+        counts: {
+          ...counts,
+          totalDevice: c.total,
+          offlineDevice: Number(counts.offlineDevice ?? 0) || c.offline,
+        },
+      },
+    };
+  });
+
   const seenHostIds = new Set<string>();
-  for (const s of sites) {
+  for (const s of enrichedSites) {
     if (s?.hostId) seenHostIds.add(String(s.hostId));
   }
 
@@ -417,6 +462,8 @@ function mergeSitesWithHosts(sites: any[], hosts: any[]): any[] {
     const name = reported.name ?? hardware.name ?? hardware.shortname ?? hostId;
     const stateRaw = String(reported.state ?? h?.state ?? "").toLowerCase();
     const isOnline = stateRaw === "connected" || stateRaw === "online";
+    const counts = deviceCountsByHost.get(hostId) ?? { total: 0, offline: 0 };
+    const totalDevice = counts.total || Number(reported.deviceCount ?? 0);
 
     synthetic.push({
       siteId: `host:${hostId}`,
@@ -432,8 +479,8 @@ function mergeSitesWithHosts(sites: any[], hosts: any[]): any[] {
       },
       statistics: {
         counts: {
-          totalDevice: Number(reported.deviceCount ?? 0),
-          offlineDevice: 0,
+          totalDevice,
+          offlineDevice: counts.offline,
           wifiClient: 0,
           wiredClient: 0,
           guestClient: 0,
@@ -448,7 +495,7 @@ function mergeSitesWithHosts(sites: any[], hosts: any[]): any[] {
     });
   }
 
-  return [...sites, ...synthetic];
+  return [...enrichedSites, ...synthetic];
 }
 
 app.use((req, res) => {
