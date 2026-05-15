@@ -170,7 +170,7 @@ function Metric({
 }
 
 function pageTitle(pathname: string): string {
-  if (pathname === "/" || pathname === "") return "Fleet Overview";
+  if (pathname === "/" || pathname === "") return "Overview";
   if (pathname.startsWith("/sites/")) return "Site Detail";
   if (pathname.startsWith("/sites")) return "Sites";
   if (pathname.startsWith("/devices")) return "Devices";
